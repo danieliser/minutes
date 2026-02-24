@@ -1,20 +1,104 @@
 """Parser module for meeting minutes input files.
 
 Handles JSONL (Claude Code interaction logs) and plain text formats.
+Filters infrastructure noise: tool results, system reminders, teammate
+protocol messages, compaction summaries, and other non-conversation content.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
+
+
+# Message types that are never conversation content
+SKIP_MESSAGE_TYPES = frozenset({
+    "progress",
+    "system",
+    "file-history-snapshot",
+    "queue-operation",
+})
+
+# Regex patterns for inline noise in text content
+_SYSTEM_REMINDER_RE = re.compile(
+    r"<system-reminder>.*?</system-reminder>", re.DOTALL
+)
+_TEAMMATE_MSG_RE = re.compile(
+    r"<teammate-message[^>]*>.*?</teammate-message>", re.DOTALL
+)
+
+# Teammate protocol JSON patterns (idle notifications, shutdown, etc.)
+_TEAMMATE_PROTOCOL_PATTERNS = (
+    '"type":"idle_notification"',
+    '"type":"shutdown_approved"',
+    '"type":"shutdown_request"',
+    '"type":"teammate_terminated"',
+    '"type": "idle_notification"',
+    '"type": "shutdown_approved"',
+    '"type": "shutdown_request"',
+    '"type": "teammate_terminated"',
+)
+
+
+def _strip_inline_noise(text: str) -> str:
+    """Remove system-reminder tags, teammate messages, and protocol JSON from text."""
+    text = _SYSTEM_REMINDER_RE.sub("", text)
+    text = _TEAMMATE_MSG_RE.sub("", text)
+    return text.strip()
+
+
+def _is_protocol_message(text: str) -> bool:
+    """Check if a message is purely teammate protocol JSON (idle, shutdown, etc.)."""
+    stripped = text.strip()
+    if not stripped:
+        return True
+    # Check for JSON protocol messages
+    for pattern in _TEAMMATE_PROTOCOL_PATTERNS:
+        if pattern in stripped:
+            return True
+    return False
+
+
+def _is_compaction_summary(obj: dict[str, Any]) -> bool:
+    """Detect compaction/context compression messages."""
+    # Check for compact_boundary system subtype
+    if obj.get("type") == "system" and obj.get("subtype") == "compact_boundary":
+        return True
+
+    message = obj.get("message", {})
+    if not isinstance(message, dict):
+        return False
+
+    content = message.get("content")
+    if isinstance(content, str):
+        # Look for compaction markers in text
+        if "conversation that ran out of context" in content.lower():
+            return True
+        if "context was compressed" in content.lower():
+            return True
+    elif isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text = block.get("text", "").lower()
+                if "conversation that ran out of context" in text:
+                    return True
+                if "context was compressed" in text:
+                    return True
+
+    return False
 
 
 def parse_jsonl(file_path: str) -> tuple[str, dict[str, Any]]:
     """Parse a JSONL file containing Claude Code interaction logs.
 
-    Extracts user and assistant messages, filtering out tool_use blocks
-    and non-message events (progress, file-history-snapshot, etc.).
+    Extracts user and assistant messages, filtering out:
+    - Non-message events (progress, system, file-history-snapshot, queue-operation)
+    - Tool use and tool result content blocks
+    - System-reminder and teammate-message inline tags
+    - Teammate protocol messages (idle notifications, shutdown requests)
+    - Compaction/context compression summaries
 
     Args:
         file_path: Path to the JSONL file
@@ -22,11 +106,13 @@ def parse_jsonl(file_path: str) -> tuple[str, dict[str, Any]]:
     Returns:
         Tuple of (consolidated_text, metadata_dict) where metadata_dict contains:
         - "messages": count of extracted messages
+        - "filtered": count of messages removed by filters
         - "skipped": count of unparseable lines
         - "format": "jsonl"
     """
-    messages = []
+    messages: list[str] = []
     bad_lines = 0
+    filtered = 0
 
     with open(file_path, 'r', encoding='utf-8') as f:
         for line in f:
@@ -40,8 +126,20 @@ def parse_jsonl(file_path: str) -> tuple[str, dict[str, Any]]:
                 bad_lines += 1
                 continue
 
-            # Skip non-message events (progress, file-history-snapshot, tool_result, etc.)
+            # Skip non-message event types
+            msg_type = obj.get("type", "")
+            if msg_type in SKIP_MESSAGE_TYPES:
+                filtered += 1
+                continue
+
+            # Skip compaction summaries
+            if _is_compaction_summary(obj):
+                filtered += 1
+                continue
+
+            # Must have a message dict
             if "message" not in obj:
+                filtered += 1
                 continue
 
             message = obj["message"]
@@ -61,15 +159,26 @@ def parse_jsonl(file_path: str) -> tuple[str, dict[str, Any]]:
             if isinstance(content, str):
                 text = content
             elif isinstance(content, list):
-                # Filter to only text blocks, skip tool_use and other types
-                text_parts = []
+                # Filter to only text blocks — skip tool_use, tool_result, and other types
+                text_parts: list[str] = []
                 for block in content:
-                    if isinstance(block, dict) and block.get("type") == "text":
-                        text_parts.append(block.get("text", ""))
+                    if isinstance(block, dict):
+                        block_type = block.get("type", "")
+                        if block_type == "text":
+                            text_parts.append(block.get("text", ""))
+                        # Skip: tool_use, tool_result, image, etc.
                 text = "".join(text_parts)
 
-            # Skip empty messages
+            # Strip inline noise (system-reminders, teammate tags)
+            text = _strip_inline_noise(text)
+
+            # Skip empty messages or pure protocol messages
             if not text or not text.strip():
+                filtered += 1
+                continue
+
+            if _is_protocol_message(text):
+                filtered += 1
                 continue
 
             # Add role label
@@ -77,10 +186,11 @@ def parse_jsonl(file_path: str) -> tuple[str, dict[str, Any]]:
             messages.append(f"{label} {text}")
 
     consolidated_text = "\n\n".join(messages)
-    metadata = {
+    metadata: dict[str, Any] = {
         "messages": len(messages),
+        "filtered": filtered,
         "skipped": bad_lines,
-        "format": "jsonl"
+        "format": "jsonl",
     }
 
     return consolidated_text, metadata
@@ -100,9 +210,9 @@ def parse_text(file_path: str) -> tuple[str, dict[str, Any]]:
     with open(file_path, 'r', encoding='utf-8') as f:
         contents = f.read()
 
-    metadata = {
+    metadata: dict[str, Any] = {
         "format": "text",
-        "chars": len(contents)
+        "chars": len(contents),
     }
 
     return contents, metadata

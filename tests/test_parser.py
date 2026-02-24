@@ -125,6 +125,253 @@ class TestParseJsonl:
         assert "valid" in text
 
 
+class TestFilters:
+    """Tests for noise filtering in JSONL parser."""
+
+    def test_filters_tool_result_content_blocks(self, tmp_path):
+        """Verify tool_result blocks in user messages are filtered."""
+        jsonl_file = tmp_path / "tool_result.jsonl"
+        jsonl_file.write_text(json.dumps({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "abc", "content": "ls output here"},
+                    {"type": "text", "text": "Now fix that bug."},
+                ],
+            },
+        }) + "\n")
+
+        text, metadata = parse_jsonl(str(jsonl_file))
+
+        assert metadata["messages"] == 1
+        assert "Now fix that bug." in text
+        assert "ls output here" not in text
+
+    def test_filters_system_reminder_tags(self, tmp_path):
+        """Verify <system-reminder> tags are stripped from text content."""
+        jsonl_file = tmp_path / "system_reminder.jsonl"
+        jsonl_file.write_text(json.dumps({
+            "type": "assistant",
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "text", "text":
+                    "Here's the fix.<system-reminder>Task tools haven't been used recently.</system-reminder> Let me apply it now."
+                }],
+            },
+        }) + "\n")
+
+        text, metadata = parse_jsonl(str(jsonl_file))
+
+        assert metadata["messages"] == 1
+        assert "Here's the fix." in text
+        assert "Let me apply it now." in text
+        assert "system-reminder" not in text
+        assert "Task tools" not in text
+
+    def test_filters_multiline_system_reminder(self, tmp_path):
+        """Verify multiline system-reminder tags are stripped."""
+        jsonl_file = tmp_path / "multiline_reminder.jsonl"
+        jsonl_file.write_text(json.dumps({
+            "type": "assistant",
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "text", "text":
+                    "Starting work.<system-reminder>\nLine 1\nLine 2\nLine 3\n</system-reminder>Done."
+                }],
+            },
+        }) + "\n")
+
+        text, metadata = parse_jsonl(str(jsonl_file))
+
+        assert "Starting work." in text
+        assert "Done." in text
+        assert "Line 1" not in text
+
+    def test_filters_teammate_message_tags(self, tmp_path):
+        """Verify <teammate-message> tags are stripped."""
+        jsonl_file = tmp_path / "teammate_msg.jsonl"
+        jsonl_file.write_text(json.dumps({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": '<teammate-message teammate_id="reviewer" color="blue" summary="Task done">Review complete.</teammate-message>',
+            },
+        }) + "\n")
+
+        text, metadata = parse_jsonl(str(jsonl_file))
+
+        # Entire message is a teammate tag — should be empty after stripping
+        assert metadata["messages"] == 0
+
+    def test_filters_idle_notification_json(self, tmp_path):
+        """Verify teammate idle notification JSON is filtered."""
+        jsonl_file = tmp_path / "idle.jsonl"
+        jsonl_file.write_text(json.dumps({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": '{"type":"idle_notification","from":"integrator","timestamp":"2026-02-24T02:36:48.101Z","idleReason":"available"}',
+            },
+        }) + "\n")
+
+        text, metadata = parse_jsonl(str(jsonl_file))
+
+        assert metadata["messages"] == 0
+
+    def test_filters_shutdown_protocol_json(self, tmp_path):
+        """Verify shutdown protocol JSON is filtered."""
+        jsonl_file = tmp_path / "shutdown.jsonl"
+        jsonl_file.write_text(json.dumps({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": '{"type": "shutdown_approved", "requestId": "abc", "from": "reviewer"}',
+            },
+        }) + "\n")
+
+        text, metadata = parse_jsonl(str(jsonl_file))
+
+        assert metadata["messages"] == 0
+
+    def test_filters_progress_messages(self, tmp_path):
+        """Verify progress type messages are filtered."""
+        jsonl_file = tmp_path / "progress.jsonl"
+        jsonl_file.write_text(
+            '{"type": "progress", "data": {"type": "agent_progress"}}\n'
+            '{"type": "progress", "data": {"type": "hook_progress"}}\n'
+            '{"type": "user", "message": {"role": "user", "content": "real message"}}\n'
+        )
+
+        text, metadata = parse_jsonl(str(jsonl_file))
+
+        assert metadata["messages"] == 1
+        assert metadata["filtered"] >= 2
+        assert "real message" in text
+
+    def test_filters_file_history_snapshot(self, tmp_path):
+        """Verify file-history-snapshot messages are filtered."""
+        jsonl_file = tmp_path / "snapshot.jsonl"
+        jsonl_file.write_text(
+            '{"type": "file-history-snapshot", "snapshot": {"files": []}}\n'
+            '{"type": "user", "message": {"role": "user", "content": "real"}}\n'
+        )
+
+        text, metadata = parse_jsonl(str(jsonl_file))
+
+        assert metadata["messages"] == 1
+        assert metadata["filtered"] >= 1
+
+    def test_filters_queue_operation(self, tmp_path):
+        """Verify queue-operation messages are filtered."""
+        jsonl_file = tmp_path / "queue.jsonl"
+        jsonl_file.write_text(
+            '{"type": "queue-operation", "operation": "enqueue", "content": "task text"}\n'
+            '{"type": "user", "message": {"role": "user", "content": "real"}}\n'
+        )
+
+        text, metadata = parse_jsonl(str(jsonl_file))
+
+        assert metadata["messages"] == 1
+        assert "task text" not in text
+
+    def test_filters_compaction_summary(self, tmp_path):
+        """Verify compaction/context compression messages are filtered."""
+        jsonl_file = tmp_path / "compaction.jsonl"
+        jsonl_file.write_text(json.dumps({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [{"type": "text", "text":
+                    "This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion."
+                }],
+            },
+        }) + "\n" + json.dumps({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": "Real question after compaction.",
+            },
+        }) + "\n")
+
+        text, metadata = parse_jsonl(str(jsonl_file))
+
+        assert metadata["messages"] == 1
+        assert "ran out of context" not in text
+        assert "Real question after compaction." in text
+
+    def test_filters_compact_boundary_system(self, tmp_path):
+        """Verify compact_boundary system messages are filtered."""
+        jsonl_file = tmp_path / "compact_boundary.jsonl"
+        jsonl_file.write_text(
+            '{"type": "system", "subtype": "compact_boundary", "tokens": {"before": 50000, "after": 20000}}\n'
+            '{"type": "user", "message": {"role": "user", "content": "Continue working"}}\n'
+        )
+
+        text, metadata = parse_jsonl(str(jsonl_file))
+
+        assert metadata["messages"] == 1
+        assert "Continue working" in text
+
+    def test_keeps_real_conversation_with_embedded_noise(self, tmp_path):
+        """Verify real conversation is preserved when mixed with noise."""
+        jsonl_file = tmp_path / "mixed.jsonl"
+        lines = [
+            '{"type": "progress", "data": {"type": "hook_progress"}}',
+            '{"type": "file-history-snapshot", "snapshot": {}}',
+            json.dumps({
+                "type": "user",
+                "message": {"role": "user", "content": [
+                    {"type": "text", "text": "Let's use Redis for caching.<system-reminder>Remember to track tasks.</system-reminder>"},
+                ]},
+            }),
+            json.dumps({
+                "type": "assistant",
+                "message": {"role": "assistant", "content": [
+                    {"type": "text", "text": "Good idea. Redis gives us TTL support."},
+                    {"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "redis-cli ping"}},
+                ]},
+            }),
+            json.dumps({
+                "type": "user",
+                "message": {"role": "user", "content": [
+                    {"type": "tool_result", "tool_use_id": "t1", "content": "PONG"},
+                    {"type": "text", "text": "Great, it's running."},
+                ]},
+            }),
+            '{"type": "queue-operation", "operation": "enqueue"}',
+        ]
+        jsonl_file.write_text("\n".join(lines) + "\n")
+
+        text, metadata = parse_jsonl(str(jsonl_file))
+
+        assert metadata["messages"] == 3
+        assert "Let's use Redis for caching." in text
+        assert "Good idea. Redis gives us TTL support." in text
+        assert "Great, it's running." in text
+        # Noise is gone
+        assert "system-reminder" not in text
+        assert "PONG" not in text
+        assert "tool_use" not in text
+        assert "hook_progress" not in text
+
+    def test_metadata_includes_filtered_count(self, tmp_path):
+        """Verify metadata tracks filtered message count."""
+        jsonl_file = tmp_path / "counting.jsonl"
+        jsonl_file.write_text(
+            '{"type": "progress", "data": {}}\n'
+            '{"type": "progress", "data": {}}\n'
+            '{"type": "system", "subtype": "turn_duration"}\n'
+            '{"type": "file-history-snapshot", "snapshot": {}}\n'
+            '{"type": "user", "message": {"role": "user", "content": "hello"}}\n'
+        )
+
+        text, metadata = parse_jsonl(str(jsonl_file))
+
+        assert metadata["messages"] == 1
+        assert metadata["filtered"] >= 4
+
+
 class TestParseText:
     """Tests for parse_text function."""
 
