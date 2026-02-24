@@ -19,6 +19,8 @@ search = [
     "faiss-cpu>=1.9",
     "sentence-transformers>=2.2",
 ]
+
+[dependency-groups]
 dev = ["pytest>=7.0"]
 
 [project.scripts]
