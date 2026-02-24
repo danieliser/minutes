@@ -1,0 +1,7 @@
+{"type": "file-history-snapshot", "messageId": "abc", "snapshot": {}}
+{"type": "progress", "data": {"type": "hook_progress"}, "sessionId": "abc"}
+{"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": "What architecture should we use?"}]}, "sessionId": "abc"}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "I recommend a layered architecture."}, {"type": "tool_use", "id": "123", "name": "Read", "input": {"path": "/some/file"}}]}, "sessionId": "abc"}
+{"type": "tool_result", "message": {"role": "tool", "content": "file contents here"}, "sessionId": "abc"}
+{"type": "user", "message": {"role": "user", "content": "Let's go with microservices."}, "sessionId": "abc"}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "Good choice. I'll set up the project structure."}]}, "sessionId": "abc"}

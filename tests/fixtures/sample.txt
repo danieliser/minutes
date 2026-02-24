@@ -1,0 +1,6 @@
+Meeting Notes - Project Kickoff
+
+Decision: Use Python for the backend
+Idea: Consider adding a web dashboard later
+Question: What's the deployment strategy?
+Action: Daniel to set up CI/CD by Friday

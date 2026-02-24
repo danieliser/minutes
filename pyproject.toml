@@ -1,0 +1,35 @@
+[project]
+name = "take-minutes"
+version = "0.1.0"
+description = "Extract structured knowledge from conversation transcripts"
+authors = [{name = "Daniel Iser"}]
+requires-python = ">=3.10"
+
+dependencies = [
+    "click>=8.1",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "openai>=1.0",
+]
+
+[project.optional-dependencies]
+search = [
+    "numpy>=2.0",
+    "faiss-cpu>=1.9",
+    "sentence-transformers>=2.2",
+]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+minutes = "minutes.cli:main"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
