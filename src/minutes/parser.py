@@ -3,12 +3,14 @@
 Handles JSONL (Claude Code interaction logs) and plain text formats.
 """
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from typing import Any
 
 
-def parse_jsonl(file_path: str) -> tuple[str, dict]:
+def parse_jsonl(file_path: str) -> tuple[str, dict[str, Any]]:
     """Parse a JSONL file containing Claude Code interaction logs.
 
     Extracts user and assistant messages, filtering out tool_use blocks
@@ -84,7 +86,7 @@ def parse_jsonl(file_path: str) -> tuple[str, dict]:
     return consolidated_text, metadata
 
 
-def parse_text(file_path: str) -> tuple[str, dict]:
+def parse_text(file_path: str) -> tuple[str, dict[str, Any]]:
     """Parse a plain text file.
 
     Args:
@@ -106,7 +108,7 @@ def parse_text(file_path: str) -> tuple[str, dict]:
     return contents, metadata
 
 
-def parse_file(file_path: str) -> tuple[str, dict]:
+def parse_file(file_path: str) -> tuple[str, dict[str, Any]]:
     """Auto-detect file format and parse accordingly.
 
     Supports:

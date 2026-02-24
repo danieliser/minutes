@@ -1,5 +1,7 @@
 """SHA-256 content hashing and dedup store backed by .dedup.json."""
 
+from __future__ import annotations
+
 import hashlib
 import json
 import os
@@ -9,18 +11,18 @@ from pathlib import Path
 class DedupStore:
     """SHA-256 content hashing and dedup store backed by .dedup.json."""
 
-    def __init__(self, output_dir: str):
+    def __init__(self, output_dir: str) -> None:  # noqa: D102
         self.store_path = Path(output_dir) / ".dedup.json"
-        self._store: dict[str, dict] = {}
+        self._store: dict[str, dict[str, str]] = {}
         self._load()
 
-    def _load(self):
+    def _load(self) -> None:  # noqa: D102
         """Load dedup store from .dedup.json if it exists."""
         if self.store_path.exists():
             with open(self.store_path) as f:
                 self._store = json.load(f)
 
-    def compute_hash(self, file_path: str) -> str:
+    def compute_hash(self, file_path: str) -> str:  # noqa: D102
         """Compute identity hash from file path + mtime + size.
 
         Uses stat metadata instead of reading file content, which is faster
@@ -54,7 +56,7 @@ class DedupStore:
         return None
 
     def record(self, file_hash: str, output_file: str, schema_version: str = "1.0",
-               input_file: str = ""):
+               input_file: str = "") -> None:  # noqa: D102
         """Record a file hash and its output file.
 
         Args:
@@ -88,7 +90,7 @@ class DedupStore:
                 return entry["output_file"]
         return None
 
-    def save(self):
+    def save(self) -> None:  # noqa: D102
         """Save dedup store to .dedup.json using atomic write.
 
         Uses temp file + rename to ensure atomicity.

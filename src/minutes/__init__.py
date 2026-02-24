@@ -1,3 +1,5 @@
 """take-minutes — Extract structured knowledge from conversation transcripts."""
 
+from __future__ import annotations
+
 __version__ = "0.2.0"

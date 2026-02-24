@@ -1,9 +1,12 @@
 """Markdown, log, and index writing for session outputs."""
 
+from __future__ import annotations
+
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from minutes.models import ExtractionResult
 
@@ -12,12 +15,12 @@ logger = logging.getLogger(__name__)
 
 def write_session_markdown(
     result: ExtractionResult,
-    metadata: dict,
+    metadata: dict[str, Any],
     output_dir: str,
     file_hash: str,
     input_file: str,
     backend_name: str,
-) -> str:
+) -> str:  # noqa: D103
     """
     Generate and write a markdown file with extracted session content.
 
@@ -127,11 +130,11 @@ def write_session_markdown(
 def append_session_log(
     output_dir: str,
     input_file: str,
-    metadata: dict,
+    metadata: dict[str, Any],
     result: ExtractionResult,
     file_hash: str,
     is_cached: bool,
-) -> None:
+) -> None:  # noqa: D103
     """
     Append a session entry to the session.log file.
 
@@ -194,7 +197,7 @@ def update_index(
     output_file: str,
     glossary_matches: int = 0,
     glossary_unknown: int = 0,
-) -> None:
+) -> None:  # noqa: D103
     """
     Update or create the index.json file with session metadata and stats.
 
@@ -267,9 +270,9 @@ def update_index(
 
 def add_glossary_section(
     markdown_path: str,
-    matches: list[dict],
-    unknown: list[dict],
-) -> None:
+    matches: list[dict[str, Any]],
+    unknown: list[dict[str, Any]],
+) -> None:  # noqa: D103
     """
     Append a Glossary Cross-Reference section to an existing markdown file.
 

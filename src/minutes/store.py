@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 try:
     import numpy as np
@@ -28,7 +29,7 @@ _CATEGORY_FIELDS = {
 class MinutesStore:
     """SQLite-backed index with FTS5 keyword search and FAISS vector search."""
 
-    def __init__(self, db_path: str | Path):
+    def __init__(self, db_path: str | Path) -> None:  # noqa: D102
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(str(self.db_path))
@@ -41,7 +42,7 @@ class MinutesStore:
         self._migrate()
         self._init_schema()
 
-    def _migrate(self):
+    def _migrate(self) -> None:  # noqa: D102
         """Migrate old schema if needed. Never drops data — uses rename-copy-drop."""
         cursor = self.conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='item_embeddings'"
@@ -67,7 +68,7 @@ class MinutesStore:
                     DROP TABLE item_embeddings_old;
                 """)
 
-    def _init_schema(self):
+    def _init_schema(self) -> None:  # noqa: D102
         self.conn.executescript("""
             CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
@@ -135,7 +136,7 @@ class MinutesStore:
         file_size: int = 0,
         message_count: int = 0,
         transcript_chars: int = 0,
-    ):
+    ) -> None:  # noqa: D102
         """Insert or replace session metadata and all extracted items."""
         # Get old item IDs for FTS cleanup
         old_ids = [row[0] for row in self.conn.execute(
@@ -193,14 +194,14 @@ class MinutesStore:
 
         self.conn.commit()
 
-    def get_session(self, session_id: str) -> dict | None:
+    def get_session(self, session_id: str) -> dict[str, Any] | None:  # noqa: D102
         """Get session metadata by ID."""
         row = self.conn.execute(
             "SELECT * FROM sessions WHERE id = ?", (session_id,)
         ).fetchone()
         return dict(row) if row else None
 
-    def is_indexed(self, session_id: str, file_hash: str = "") -> bool:
+    def is_indexed(self, session_id: str, file_hash: str = "") -> bool:  # noqa: D102
         """Check if a session is already indexed (optionally with matching hash)."""
         row = self.conn.execute(
             "SELECT file_hash FROM sessions WHERE id = ?", (session_id,)
@@ -216,7 +217,7 @@ class MinutesStore:
         project_key: str | None = None,
         since: str | None = None,
         limit: int = 100,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:  # noqa: D102
         """List sessions, optionally filtered by project and date."""
         query = "SELECT * FROM sessions WHERE 1=1"
         params: list = []
@@ -234,7 +235,7 @@ class MinutesStore:
         rows = self.conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
-    def search_keyword(self, query: str, category: str | None = None, limit: int = 10) -> list[dict]:
+    def search_keyword(self, query: str, category: str | None = None, limit: int = 10) -> list[dict[str, Any]]:  # noqa: D102
         """Full-text search via FTS5."""
         sql = """
             SELECT i.id, i.session_id, i.category, i.content, i.detail, i.owner,
@@ -255,7 +256,7 @@ class MinutesStore:
         rows = self.conn.execute(sql, params).fetchall()
         return [dict(r) for r in rows]
 
-    def get_all_embeddings(self, model: str = "all-mpnet-base-v2") -> tuple[list[int], np.ndarray]:
+    def get_all_embeddings(self, model: str = "all-mpnet-base-v2") -> tuple[list[int], Any]:  # noqa: D102
         """Load all item embeddings for a given model into a numpy matrix."""
         cursor = self.conn.execute(
             "SELECT item_id, embedding FROM item_embeddings WHERE model = ? ORDER BY item_id",
@@ -273,7 +274,7 @@ class MinutesStore:
 
         return item_ids, np.stack(embeddings, axis=0)
 
-    def store_embeddings(self, item_ids: list[int], embeddings: np.ndarray, model: str = "all-mpnet-base-v2"):
+    def store_embeddings(self, item_ids: list[int], embeddings: Any, model: str = "all-mpnet-base-v2") -> None:  # noqa: D102
         """Store embeddings as float32 BLOBs."""
         for item_id, emb in zip(item_ids, embeddings):
             self.conn.execute(
@@ -282,7 +283,7 @@ class MinutesStore:
             )
         self.conn.commit()
 
-    def get_unembedded_items(self, model: str = "all-mpnet-base-v2") -> list[dict]:
+    def get_unembedded_items(self, model: str = "all-mpnet-base-v2") -> list[dict[str, Any]]:  # noqa: D102
         """Get items that don't have embeddings for the given model."""
         rows = self.conn.execute("""
             SELECT i.id, i.content, i.detail
@@ -292,7 +293,7 @@ class MinutesStore:
         """, (model,)).fetchall()
         return [dict(r) for r in rows]
 
-    def get_item(self, item_id: int) -> dict | None:
+    def get_item(self, item_id: int) -> dict[str, Any] | None:  # noqa: D102
         """Get a single item by ID with session info."""
         row = self.conn.execute("""
             SELECT i.*, s.project_key, s.input_file AS session_file, s.extracted_at
@@ -304,11 +305,11 @@ class MinutesStore:
 
     def search_vector(
         self,
-        query_embedding: np.ndarray,
+        query_embedding: Any,
         category: str | None = None,
         limit: int = 10,
         model: str = "all-mpnet-base-v2",
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:  # noqa: D102
         """Vector similarity search using FAISS IndexFlatIP."""
         try:
             import faiss
@@ -368,11 +369,11 @@ class MinutesStore:
     def search_hybrid(
         self,
         query: str,
-        query_embedding: np.ndarray | None = None,
+        query_embedding: Any | None = None,
         category: str | None = None,
         limit: int = 10,
         model: str = "all-mpnet-base-v2",
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:  # noqa: D102
         """Hybrid keyword + vector search merged via RRF."""
         ranked_lists = []
 
@@ -413,7 +414,7 @@ class MinutesStore:
 
         return results
 
-    def stats(self) -> dict:
+    def stats(self) -> dict[str, Any]:  # noqa: D102
         """Get aggregate stats across all sessions."""
         row = self.conn.execute("""
             SELECT COUNT(*) as session_count,
@@ -427,14 +428,14 @@ class MinutesStore:
         """).fetchone()
         return dict(row) if row else {}
 
-    def close(self):
+    def close(self) -> None:  # noqa: D102
         self.conn.close()
 
 
-def _rrf_merge(ranked_lists: list[list[dict]], k: int = 60) -> list[dict]:
+def _rrf_merge(ranked_lists: list[list[dict[str, Any]]], k: int = 60) -> list[dict[str, Any]]:  # noqa: D103
     """Reciprocal Rank Fusion — merge multiple ranked lists."""
     score_map: dict[int, float] = {}
-    item_map: dict[int, dict] = {}
+    item_map: dict[int, dict[str, Any]] = {}
 
     for ranked_list in ranked_lists:
         for rank, item in enumerate(ranked_list, start=1):

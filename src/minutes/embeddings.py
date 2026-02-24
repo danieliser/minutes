@@ -1,7 +1,10 @@
 """Embedding client with tiered models: fast (mpnet) and quality (Qwen3)."""
 
+from __future__ import annotations
+
 import logging
 import os
+from typing import Any
 
 try:
     import numpy as np
@@ -21,10 +24,10 @@ MODELS = {
 DEFAULT_MODEL = "fast"
 
 # Lazy-loaded model cache (supports multiple models loaded simultaneously)
-_models: dict[str, object] = {}
+_models: dict[str, Any] = {}
 
 
-def _get_model(model_key: str = DEFAULT_MODEL):
+def _get_model(model_key: str = DEFAULT_MODEL) -> Any:  # noqa: D103
     """Lazy-load a sentence-transformers model by key or HF ID."""
     # Resolve alias → HF ID
     if model_key in MODELS:
@@ -49,7 +52,7 @@ def _get_model(model_key: str = DEFAULT_MODEL):
     return _models[hf_id]
 
 
-def get_dims(model_key: str = DEFAULT_MODEL) -> int:
+def get_dims(model_key: str = DEFAULT_MODEL) -> int:  # noqa: D103
     """Get the embedding dimensions for a model key."""
     if model_key in MODELS:
         return MODELS[model_key][1]
@@ -58,7 +61,7 @@ def get_dims(model_key: str = DEFAULT_MODEL) -> int:
     return model.get_sentence_embedding_dimension()
 
 
-def embed(texts: list[str], model_key: str = DEFAULT_MODEL) -> np.ndarray:
+def embed(texts: list[str], model_key: str = DEFAULT_MODEL) -> Any:  # noqa: D103
     """Embed a batch of texts into normalized float32 vectors.
 
     Args:
@@ -77,7 +80,7 @@ def embed(texts: list[str], model_key: str = DEFAULT_MODEL) -> np.ndarray:
     return model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
 
 
-def embed_one(text: str, model_key: str = DEFAULT_MODEL) -> np.ndarray:
+def embed_one(text: str, model_key: str = DEFAULT_MODEL) -> Any:  # noqa: D103
     """Embed a single text string.
 
     Returns:

@@ -1,5 +1,7 @@
 """Configuration management for minutes CLI."""
 
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,7 +27,7 @@ Transcript:
 Be literal; do not embellish or infer."""
 
 
-def _resolve_prompt(env_var_name: str, default: str) -> str:
+def _resolve_prompt(env_var_name: str, default: str) -> str:  # noqa: D103
     """
     Resolve a prompt value from environment variable.
 
@@ -69,7 +71,7 @@ class Config:
     verbose: bool = False
 
 
-def load_config() -> Config:
+def load_config() -> Config:  # noqa: D103
     """
     Load configuration from environment variables and .env file.
 

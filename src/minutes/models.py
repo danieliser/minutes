@@ -1,5 +1,7 @@
 """Pydantic models for structured knowledge extraction."""
 
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
 
 

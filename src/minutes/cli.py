@@ -1,5 +1,7 @@
 """Click CLI entry point for minutes tool."""
 
+from __future__ import annotations
+
 import logging
 import os
 import re
@@ -7,6 +9,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -31,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 @click.group()
-def main():
+def main() -> None:  # noqa: D103
     """minutes — Extract structured knowledge from conversation transcripts."""
     pass
 
@@ -41,7 +44,7 @@ def main():
 @click.option('--output', '-o', type=click.Path(), help='Output directory')
 @click.option('--no-dedup', is_flag=True, help='Skip deduplication check')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
-def process(file, output, no_dedup, verbose):
+def process(file: str, output: str | None, no_dedup: bool, verbose: bool) -> None:  # noqa: D103
     """Process a transcript and extract structured knowledge.
 
     \b
@@ -238,7 +241,7 @@ def process(file, output, no_dedup, verbose):
 @click.argument('directory', type=click.Path(exists=False))
 @click.option('--output', '-o', type=click.Path(), help='Output directory')
 @click.option('--interval', type=int, default=5, help='Poll interval in seconds')
-def watch(directory, output, interval):
+def watch(directory: str, output: str | None, interval: int) -> None:  # noqa: D103
     """Watch a directory for new transcripts and process them.
 
     DIRECTORY: Directory to watch for .txt, .md, .jsonl files
@@ -352,7 +355,7 @@ def watch(directory, output, interval):
 
 @main.command()
 @click.option('--env', is_flag=True, help='Show .env file path')
-def config(env):
+def config(env: bool) -> None:  # noqa: D103
     """Display active configuration values.
 
     \b
@@ -387,7 +390,7 @@ def config(env):
 
 
 @main.command()
-def setup():
+def setup() -> None:  # noqa: D103
     """Set up minutes tool: check dependencies and cache models.
 
     \b
@@ -436,7 +439,7 @@ def setup():
         sys.exit(1)
 
 
-def _parse_since(since: str) -> datetime:
+def _parse_since(since: str) -> datetime:  # noqa: D103
     """Parse --since value: ISO date or relative like '2w', '7d', '30d'."""
     m = re.match(r'^(\d+)([dwm])$', since)
     if m:
@@ -453,7 +456,7 @@ def _find_main_sessions(
     min_size: int = 10240,
     project_filter: str | None = None,
     sort: str = "date",
-) -> list[tuple[str, Path]]:
+) -> list[tuple[str, Path]]:  # noqa: D103
     """Find main-thread session JSONL files (skip subagents/).
 
     Args:
@@ -511,7 +514,7 @@ def _find_main_sessions(
 @click.option('--no-embed', is_flag=True, help='Skip embedding generation')
 @click.option('--sort', type=click.Choice(['date', 'date-asc', 'size', 'size-asc', 'project']), default='date', help='Sort order for sessions')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
-def batch(project, since, min_size, output, dry_run, no_embed, sort, verbose):
+def batch(project: str | None, since: str | None, min_size: str, output: str | None, dry_run: bool, no_embed: bool, sort: str, verbose: bool) -> None:  # noqa: D103
     """Batch process historical session transcripts.
 
     Scans ~/.claude/projects/ for main-thread JSONL files, extracts structured
@@ -700,7 +703,7 @@ def batch(project, since, min_size, output, dry_run, no_embed, sort, verbose):
 @click.option('--category', type=str, default=None, help='Filter by category (decision, idea, question, action_item, concept, term)')
 @click.option('--limit', type=int, default=10, help='Max results')
 @click.option('--mode', type=click.Choice(['keyword', 'vector', 'hybrid']), default='hybrid', help='Search mode')
-def search(query, project, category, limit, mode):
+def search(query: str, project: str | None, category: str | None, limit: int, mode: str) -> None:  # noqa: D103
     """Search across all indexed session extractions.
 
     \b

@@ -1,5 +1,7 @@
 """LLM extraction pipeline for structured knowledge from transcripts."""
 
+from __future__ import annotations
+
 import json
 import logging
 import re
@@ -38,7 +40,7 @@ _FILLER_PATTERNS = [
 ]
 
 
-def cleanup_result(result: ExtractionResult, transcript: str = "") -> ExtractionResult:
+def cleanup_result(result: ExtractionResult, transcript: str = "") -> ExtractionResult:  # noqa: D103
     """Post-extraction cleanup: normalize owners, strip filler, validate dates."""
     for d in result.decisions:
         d.owner = _clean_owner(d.owner)
@@ -61,7 +63,7 @@ def cleanup_result(result: ExtractionResult, transcript: str = "") -> Extraction
     return result
 
 
-def _clean_owner(value: str) -> str:
+def _clean_owner(value: str) -> str:  # noqa: D103
     if not value:
         return ""
     if _VALID_OWNER_RE.match(value):
@@ -73,7 +75,7 @@ def _clean_owner(value: str) -> str:
     return value
 
 
-def _clean_filler(value: str) -> str:
+def _clean_filler(value: str) -> str:  # noqa: D103
     if not value:
         return ""
     for pattern in _FILLER_PATTERNS:
@@ -82,7 +84,7 @@ def _clean_filler(value: str) -> str:
     return value
 
 
-def _clean_ungrounded(value: str, transcript: str) -> str:
+def _clean_ungrounded(value: str, transcript: str) -> str:  # noqa: D103
     if not value:
         return ""
     value_words = set(w.lower() for w in re.findall(r'\b\w{4,}\b', value))
@@ -95,7 +97,7 @@ def _clean_ungrounded(value: str, transcript: str) -> str:
     return value
 
 
-def _clean_date(value: str, transcript: str) -> str:
+def _clean_date(value: str, transcript: str) -> str:  # noqa: D103
     if not value:
         return ""
     return value if value in transcript else ""
@@ -104,11 +106,11 @@ def _clean_date(value: str, transcript: str) -> str:
 class GatewayBackend:
     """LLM backend using the model gateway."""
 
-    def __init__(self, model: str = "qwen3-4b", base_url: str = "http://localhost:8800/v1"):
+    def __init__(self, model: str = "qwen3-4b", base_url: str = "http://localhost:8800/v1") -> None:  # noqa: D102
         self.client = openai.OpenAI(base_url=base_url, api_key="not-needed")
         self.model = model
 
-    def generate(self, system_prompt: str, user_prompt: str) -> str:
+    def generate(self, system_prompt: str, user_prompt: str) -> str:  # noqa: D102
         """Generate text using the model gateway.
 
         Args:
@@ -128,7 +130,7 @@ class GatewayBackend:
         return response.choices[0].message.content
 
 
-def get_backend(config: Config) -> tuple[GatewayBackend, str]:
+def get_backend(config: Config) -> tuple[GatewayBackend, str]:  # noqa: D103
     """Get LLM backend via model gateway.
 
     Auto-starts the gateway if not running.
@@ -157,7 +159,7 @@ def get_backend(config: Config) -> tuple[GatewayBackend, str]:
     return backend, "gateway"
 
 
-def extract_json_block(text: str) -> str:
+def extract_json_block(text: str) -> str:  # noqa: D103
     """Extract JSON from LLM response, handling various formats.
 
     Handles:
@@ -200,7 +202,7 @@ def extract_json_block(text: str) -> str:
     return json_str
 
 
-def chunk_transcript(text: str, max_size: int, overlap: int) -> list[str]:
+def chunk_transcript(text: str, max_size: int, overlap: int) -> list[str]:  # noqa: D103
     """Split transcript into overlapping chunks.
 
     Prefers paragraph boundaries (double newlines) for chunk breaks.
@@ -245,7 +247,7 @@ def chunk_transcript(text: str, max_size: int, overlap: int) -> list[str]:
     return chunks if chunks else [text]
 
 
-def merge_results(results: list[ExtractionResult]) -> ExtractionResult:
+def merge_results(results: list[ExtractionResult]) -> ExtractionResult:  # noqa: D103
     """Merge multiple extraction results, deduplicating and selecting best items.
 
     Deduplication:
@@ -310,8 +312,8 @@ def merge_results(results: list[ExtractionResult]) -> ExtractionResult:
 
 
 def _deduplicate_by_similarity(
-    items: list, attr: str, threshold: float = 0.8
-) -> list:
+    items: list[object], attr: str, threshold: float = 0.8
+) -> list[object]:  # noqa: D103
     """Deduplicate items by >threshold text similarity on an attribute."""
     if not items:
         return []
@@ -335,10 +337,10 @@ def _deduplicate_by_similarity(
 
 
 def _cross_category_dedup(
-    items: list, items_attr: str,
-    reference: list, reference_attr: str,
+    items: list[object], items_attr: str,
+    reference: list[object], reference_attr: str,
     threshold: float = 0.8,
-) -> list:
+) -> list[object]:  # noqa: D103
     """Remove items that duplicate entries in a reference category."""
     if not items or not reference:
         return items
@@ -355,7 +357,7 @@ def _cross_category_dedup(
     return kept
 
 
-def _deduplicate_by_exact_attr(items: list, attr: str) -> list:
+def _deduplicate_by_exact_attr(items: list[object], attr: str) -> list[object]:  # noqa: D103
     """Deduplicate items by exact attribute match, keeping first occurrence."""
     if not items:
         return []
@@ -375,7 +377,7 @@ def extract_structured(
     backend: GatewayBackend,
     config: Config,
     transcript: str,
-) -> ExtractionResult:
+) -> ExtractionResult:  # noqa: D103
     """Extract structured knowledge from transcript using LLM.
 
     Retries up to config.max_retries times on validation error.
@@ -423,7 +425,7 @@ def process_transcript(
     backend: GatewayBackend,
     config: Config,
     transcript: str,
-) -> ExtractionResult:
+) -> ExtractionResult:  # noqa: D103
     """Process transcript, chunking if necessary and merging results."""
     if not transcript:
         return ExtractionResult()

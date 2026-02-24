@@ -1,7 +1,10 @@
 """Glossary loading and keyword matching."""
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -10,7 +13,7 @@ from minutes.models import ExtractionResult
 logger = logging.getLogger(__name__)
 
 
-def load_glossary(path: str) -> list[dict]:
+def load_glossary(path: str) -> list[dict[str, Any]]:  # noqa: D103
     """
     Load glossary from YAML file.
 
@@ -52,8 +55,8 @@ def load_glossary(path: str) -> list[dict]:
 
 def match_terms(
     extracted: ExtractionResult,
-    glossary: list[dict],
-) -> tuple[list[dict], list[dict]]:
+    glossary: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:  # noqa: D103
     """
     Match extracted terms and concepts against glossary.
 
