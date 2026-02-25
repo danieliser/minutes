@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-02-25
+
+### Added
+- `--mode changes` — extract code change timeline (Edit/Write tool uses with reasoning)
+- `--mode intent` — LLM-summarized user intent from prompts (primary goal, sub-goals, constraints)
+- `--mode stats` — tool usage statistics with optional `--detail` call log
+- `--mode review` — gap analysis comparing user intent against code changes (alignment score, covered/gaps/unasked)
+- `JsonlReader` shared JSONL iteration infrastructure with lenient/strict modes
+- `ReviewResult` and `ReviewItem` models for structured gap analysis
+- `CodeChange`, `ChangeTimeline`, `ToolCall`, `ToolStats`, `IntentSummary` models
+- `filters.py` — shared noise filtering (system reminders, teammate tags, protocol messages)
+- 8 new test files with comprehensive coverage for all new modes
+
+### Changed
+- Refactored all modules to max 270 lines — 16 new focused modules from 6 large ones
+- `cli.py` split into `cli_process.py`, `cli_batch.py`, `cli_watch.py`, `cli_search.py`, `cli_utils.py`
+- `extractor.py` split into `extractor_chunking.py`, `extractor_cleanup.py`, `extractor_dedup.py`
+- `store.py` split into `store_schema.py`, `store_search.py`
+- `output.py` split into `output_markdown.py`, `output_logs.py`
+- `changes.py` split into `changes_parse.py`, `changes_format.py`
+
+### Fixed
+- GatewayBackend interface — intent/review modes now use `backend.client` correctly
+- JSON code fence stripping for LLM responses wrapped in ```json blocks
+
 ## [0.3.0] - 2026-02-24
 
 ### Added
