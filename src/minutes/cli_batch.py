@@ -236,17 +236,9 @@ def _batch_extract(
 
     dedup.record(file_hash, markdown_path, input_file=str(session_file))
 
-    # Pipe to AutoMem if configured
-    try:
-        from minutes.memory_pipe import pipe_to_memory
-        mem_result = pipe_to_memory(result, session_id=session_id, project_key=project_key)
-        mem_note = f" mem:{mem_result.get('stored', 0)}" if mem_result["status"] == "complete" else ""
-    except Exception:
-        mem_note = ""
-
     counts = (f"{len(result.decisions)}d {len(result.ideas)}i "
               f"{len(result.questions)}q {len(result.action_items)}a "
-              f"{len(result.concepts)}c {len(result.terms)}t{mem_note}")
+              f"{len(result.concepts)}c {len(result.terms)}t")
     click.secho(f"    ✓ {counts}", fg='green')
 
 

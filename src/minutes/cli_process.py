@@ -177,19 +177,6 @@ def handle_process(
             if config.verbose:
                 click.secho(f"Warning: Could not index in store: {e}", fg='yellow', err=True)
 
-        # Pipe to AutoMem if configured
-        if not is_cached:
-            try:
-                from minutes.memory_pipe import pipe_to_memory
-                session_id = Path(file).stem
-                project_key = Path(config.output_dir).name or "unknown"
-                mem_result = pipe_to_memory(result, session_id=session_id, project_key=project_key)
-                if mem_result["status"] == "complete" and mem_result.get("stored", 0) > 0:
-                    click.echo(f"  Memories: {mem_result['stored']} stored in AutoMem")
-            except Exception as e:
-                if config.verbose:
-                    click.secho(f"Warning: Memory pipe failed: {e}", fg='yellow', err=True)
-
         click.secho("✓ Processing complete", fg='green')
         click.echo(f"  Decisions: {len(result.decisions)}")
         click.echo(f"  Ideas: {len(result.ideas)}")
