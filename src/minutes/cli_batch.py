@@ -46,8 +46,10 @@ def handle_batch(
     since_dt = parse_since(since) if since else None
 
     projects_dir = Path.home() / ".claude" / "projects"
-    sessions = find_main_sessions(projects_dir, since=since_dt, min_size=min_bytes,
-                                  max_size=max_bytes, project_filter=project, sort=sort)
+    sessions = find_main_sessions(
+        projects_dir, since=since_dt, min_size=min_bytes,
+        max_size=max_bytes, project_filter=project, sort=sort,
+    )
 
     if not sessions:
         click.secho("No matching sessions found.", fg='yellow')
@@ -57,8 +59,8 @@ def handle_batch(
 
     from minutes.store import MinutesStore
 
-    # Pre-scan: separate already-indexed from work-to-do
-    pending: list[tuple[str, Path, str]] = []  # (project_key, session_file, file_hash)
+    # Pre-scan: separate already-indexed sessions from pending work
+    pending: list[tuple[str, Path, str]] = []
     skipped = 0
 
     for project_key, session_file in sessions:
@@ -83,7 +85,10 @@ def handle_batch(
             pending.append((project_key, session_file, file_hash))
 
     if not pending:
-        click.secho(f"All {len(sessions)} sessions already indexed, nothing to do.", fg='green')
+        click.secho(
+            f"All {len(sessions)} sessions already indexed, nothing to do.",
+            fg='green',
+        )
         return
 
     click.secho(f"{len(pending)} to process, {skipped} already indexed", fg='cyan')
@@ -112,6 +117,8 @@ def handle_batch(
         except RuntimeError as e:
             click.secho(f"Error: {e}", fg='red', err=True)
             sys.exit(2)
+
+    from minutes.progress import BatchProgress
 
     processed = 0
     errors = 0
@@ -146,8 +153,9 @@ def handle_batch(
                         bp.start_file(session_file.name, total, done)
 
                     _batch_extract(
-                        session_file, output_dir, store, dedup, backend, backend_name,
-                        config, raw, session_id, project_key, file_hash,
+                        session_file, output_dir, store, dedup, backend,
+                        backend_name, config, raw, session_id, project_key,
+                        file_hash,
                         on_chunk_done=bp.advance_chunk,
                         on_chunks_ready=_on_chunks_ready,
                         log=bp.log,
@@ -164,53 +172,82 @@ def handle_batch(
     if not no_embed and processed > 0 and mode == 'extract':
         _generate_embeddings(output_base)
 
-    click.echo(f"\nBatch complete: {processed} processed, {skipped} skipped, {errors} errors")
+    click.echo(
+        f"\nBatch complete: {processed} processed, {skipped} skipped, "
+        f"{errors} errors"
+    )
 
 
-def _batch_changes(session_file: Path, output_dir: Path, full: bool, strict: bool) -> None:
-    from minutes.changes import parse_changes, format_changes_markdown
+def _batch_changes(
+    session_file: Path, output_dir: Path, full: bool, strict: bool,
+) -> None:
+    from minutes.changes import format_changes_markdown, parse_changes
     timeline = parse_changes(str(session_file), strict=strict)
     markdown = format_changes_markdown(timeline, session_file.name, full=full)
     out_file = output_dir / f"{session_file.stem}-changes.md"
     out_file.write_text(markdown)
-    click.secho(f"    ✓ {timeline.total_edits}e {timeline.total_writes}w", fg='green')
+    click.secho(
+        f"    ✓ {timeline.total_edits}e {timeline.total_writes}w", fg='green',
+    )
 
 
-def _batch_stats(session_file: Path, output_dir: Path, detail: bool, strict: bool) -> None:
+def _batch_stats(
+    session_file: Path, output_dir: Path, detail: bool, strict: bool,
+) -> None:
     from minutes.changes import collect_stats, format_stats_markdown
     stats_result = collect_stats(str(session_file), detail=detail, strict=strict)
-    markdown = format_stats_markdown(stats_result, session_file.name, detail=detail)
+    markdown = format_stats_markdown(
+        stats_result, session_file.name, detail=detail,
+    )
     out_file = output_dir / f"{session_file.stem}-stats.md"
     out_file.write_text(markdown)
     click.secho(f"    ✓ {stats_result.total_calls} calls", fg='green')
 
 
-def _batch_intent(session_file: Path, output_dir: Path, backend, strict: bool) -> str:
-    from minutes.intent import extract_user_prompts, summarize_intent, format_intent_markdown
+def _batch_intent(
+    session_file: Path, output_dir: Path, backend, strict: bool,
+) -> str:
+    from minutes.intent import (
+        extract_user_prompts,
+        format_intent_markdown,
+        summarize_intent,
+    )
     prompts = extract_user_prompts(str(session_file), strict=strict)
     if not prompts:
-        click.secho(f"    Skip (no prompts)", fg='yellow')
+        click.secho("    Skip (no prompts)", fg='yellow')
         return 'skipped'
     try:
         intent = summarize_intent(backend, prompts)
         markdown = format_intent_markdown(intent)
         out_file = output_dir / f"{session_file.stem}-intent.md"
         out_file.write_text(markdown)
-        click.secho(f"    ✓ {intent.primary_goal[:60] if intent.primary_goal else 'no goal'}", fg='green')
+        click.secho(
+            f"    ✓ {intent.primary_goal[:60] if intent.primary_goal else 'no goal'}",
+            fg='green',
+        )
         return 'processed'
     except Exception as e:
-        click.secho(f"    Warning: LLM failed for {session_file.name}: {e}", fg='yellow', err=True)
+        click.secho(
+            f"    Warning: LLM failed for {session_file.name}: {e}",
+            fg='yellow', err=True,
+        )
         return 'skipped'
 
 
-def _batch_review(session_file: Path, output_dir: Path, backend, strict: bool) -> None:
+def _batch_review(
+    session_file: Path, output_dir: Path, backend, strict: bool,
+) -> None:
     from minutes.review import run_review
     from minutes.review_format import format_review_markdown
     result = run_review(backend, str(session_file), strict=strict)
     markdown = format_review_markdown(result, session_file.name)
     out_file = output_dir / f"{session_file.stem}-review.md"
     out_file.write_text(markdown)
-    click.secho(f"    ✓ alignment: {result.alignment_score:.2f} | covered: {len(result.covered)} | gaps: {len(result.gaps)}", fg='green')
+    click.secho(
+        f"    ✓ alignment: {result.alignment_score:.2f} "
+        f"| covered: {len(result.covered)} | gaps: {len(result.gaps)}",
+        fg='green',
+    )
 
 
 def _batch_extract(
@@ -271,9 +308,11 @@ def _batch_extract(
 
     dedup.record(file_hash, markdown_path, input_file=str(session_file))
 
-    counts = (f"{len(result.decisions)}d {len(result.ideas)}i "
-              f"{len(result.questions)}q {len(result.action_items)}a "
-              f"{len(result.concepts)}c {len(result.terms)}t")
+    counts = (
+        f"{len(result.decisions)}d {len(result.ideas)}i "
+        f"{len(result.questions)}q {len(result.action_items)}a "
+        f"{len(result.concepts)}c {len(result.terms)}t"
+    )
     _log = log or click.echo
     _log(f"    ✓ {counts}")
 
@@ -301,16 +340,24 @@ def _generate_embeddings(output_base: Path) -> None:
                 store.close()
                 continue
 
-            texts = [f"{item['content']} {item.get('detail') or ''}".strip()
-                     for item in unembedded]
+            texts = [
+                f"{item['content']} {item.get('detail') or ''}".strip()
+                for item in unembedded
+            ]
             item_ids = [item['id'] for item in unembedded]
 
             vectors = emb.embed(texts)
             store.store_embeddings(item_ids, vectors, model=hf_id)
-            click.secho(f"  ✓ {project_dir.name}: {len(item_ids)} items", fg='green')
+            click.secho(
+                f"  ✓ {project_dir.name}: {len(item_ids)} items", fg='green',
+            )
             store.close()
 
     except ImportError:
-        click.secho("  Warning: sentence-transformers not installed, skipping embeddings. Install: pip install 'take-minutes[search]'", fg='yellow', err=True)
+        click.secho(
+            "  Warning: sentence-transformers not installed, skipping "
+            "embeddings. Install: pip install 'take-minutes[search]'",
+            fg='yellow', err=True,
+        )
     except Exception as e:
         click.secho(f"  Embedding error: {e}", fg='red', err=True)
