@@ -63,7 +63,7 @@ def handle_batch(
     if mode in ('changes', 'stats'):
         backend = None
         backend_name = "structural"
-    elif mode == 'intent':
+    elif mode in ('intent', 'review'):
         try:
             backend, backend_name = get_backend(config)
         except RuntimeError as e:
@@ -121,6 +121,9 @@ def handle_batch(
                     skipped += 1
                 else:
                     processed += 1
+            elif mode == 'review':
+                _batch_review(session_file, output_dir, backend, strict)
+                processed += 1
             else:  # extract
                 _batch_extract(
                     session_file, output_dir, store, dedup, backend, backend_name,
@@ -174,6 +177,16 @@ def _batch_intent(session_file: Path, output_dir: Path, backend, strict: bool) -
     except Exception as e:
         click.secho(f"    Warning: LLM failed for {session_file.name}: {e}", fg='yellow', err=True)
         return 'skipped'
+
+
+def _batch_review(session_file: Path, output_dir: Path, backend, strict: bool) -> None:
+    from minutes.review import run_review
+    from minutes.review_format import format_review_markdown
+    result = run_review(backend, str(session_file), strict=strict)
+    markdown = format_review_markdown(result, session_file.name)
+    out_file = output_dir / f"{session_file.stem}-review.md"
+    out_file.write_text(markdown)
+    click.secho(f"    ✓ alignment: {result.alignment_score:.2f} | covered: {len(result.covered)} | gaps: {len(result.gaps)}", fg='green')
 
 
 def _batch_extract(

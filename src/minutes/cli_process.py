@@ -268,3 +268,26 @@ def _handle_mode(
             click.secho("Warning: LLM summarization failed. Showing extracted prompts only.", fg='yellow', err=True)
         click.echo(f"  Prompts analyzed: {len(prompts)}")
         click.echo(f"  Output: {out_file}")
+
+    elif mode == 'review':
+        from minutes.review import run_review
+        from minutes.review_format import format_review_markdown
+
+        try:
+            backend, backend_name = get_backend(config)
+        except RuntimeError as e:
+            click.secho(f"Error: {e}", fg='red', err=True)
+            sys.exit(2)
+
+        result = run_review(backend, file, strict=strict)
+        markdown = format_review_markdown(result, Path(file).name)
+        out_file = output_dir / f"{stem}-review.md"
+        out_file.write_text(markdown)
+
+        if result.summary:
+            click.secho(f"✓ Review complete — alignment: {result.alignment_score:.2f}", fg='green')
+        else:
+            click.secho("Warning: Review analysis could not be generated.", fg='yellow', err=True)
+        click.echo(f"  Covered: {len(result.covered)} | Gaps: {len(result.gaps)} | Unasked: {len(result.unasked)}")
+        click.echo(f"  Prompts: {result.intent_prompt_count} | Changes: {result.changes_count}")
+        click.echo(f"  Output: {out_file}")

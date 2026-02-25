@@ -123,3 +123,22 @@ class IntentSummary(BaseModel):
     sub_goals: list[str] = Field(default_factory=list)
     constraints: list[str] = Field(default_factory=list)
     prompt_count: int = 0
+
+
+class ReviewItem(BaseModel):
+    """A single item in a review gap analysis."""
+
+    description: str = ""
+    evidence: str = ""
+
+
+class ReviewResult(BaseModel):
+    """Gap analysis comparing user intent against code changes."""
+
+    alignment_score: float = 0.0
+    covered: list[ReviewItem] = Field(default_factory=list)
+    gaps: list[ReviewItem] = Field(default_factory=list)
+    unasked: list[ReviewItem] = Field(default_factory=list)
+    summary: str = ""
+    intent_prompt_count: int = 0
+    changes_count: int = 0
